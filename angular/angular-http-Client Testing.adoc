@@ -249,7 +249,7 @@ Unit Tests for the Service
 ```ts
 describe('UserService', () => {
     let userService: UserService;
-    lethttpTesting: HttpTestingController;
+    let httpTesting: HttpTestingController;
 
     beforeEach( () => {
         TestBed.configureTestingModule({
