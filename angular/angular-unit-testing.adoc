@@ -1,0 +1,1139 @@
+== Code Under Test
+
+Utility Function code
+
+```ts
+import { Injectable } from '@angular/core';
+
+@Injectable()
+export class UtilsService {
+    range = (start: number, end: number): number[] => {
+        return [...Array(end - start).keys()].map((el) => el + start);
+    };
+
+    pluck = (elements: any[], field: string) => {
+        return elements.map((el) => el[field]);
+    };
+}}
+
+```
+
+Code for User Srevice
+```ts
+import { Injectable } from '@angular/core';
+import { UserInteface } from '../types/user.interface';
+
+@Injectable()
+export class UsersService {
+  users: UserInteface[] = [];
+  
+  addUser(user: UserInteface): void { 
+    this.users = [...this.users, user];
+  }
+  
+  removeUser(userId: string): void {
+    const updatedUsers = this.users.filter((user) => userId !== user.id); 
+    this.users = updatedUsers;
+  }
+}
+```
+
+== Basic Setup
+
+The following is a simple setup for testing an Angular service. It uses the Angular TestBed to configure the testing module and inject the service.
+
+Remeber you are testing behaviours not plain values
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import { SwapiService, SwapiResponse, Person } from './swapi.service';
+
+describe('SwapiService', () => {
+  let userService: UserService;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [
+        SomeComponent
+      ],
+      declarations: [],
+      providers: [
+        UserService,
+      ]
+    });
+
+    // Inject the service and the mock http controller.
+    userService = TestBed.inject(UserService);
+  });
+
+  afterEach(() => {
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+});
+```
+
+Use `declarations` to declare non-standalone components, directives, and pipes that you are testing or that are used in the templates of the component under test.
+Example:
+
+```ts
+    declarations: [MyComponent, MyPipe, MyDirective]
+```
+
+Use `imports` to import Angular modules (or StandAlone Components) that your component or its template depends on (e.g., CommonModule, FormsModule,)
+
+```ts
+    imports: [CommonModule, FormsModule, HttpClientTestingModule]
+```
+
+Example:
+```ts
+import { ComponentFixture, Test Bed } from "@angular/core/testing" 
+import { ClicksResultComponent } from "./clicks-result.component";
+
+describe("Clicks ResultComponent", () => {
+
+  let component: ClicksResultComponent;
+  let fixture: ComponentFixture<ClicksResultComponent>; 
+  
+  beforeEach (async () => {
+    await TestBed.configureTestingModule({
+      imports: [ClicksResultComponent], // Standalone (Angular 18) component
+      providers: []
+    }).compileComponents();
+
+    // Fixture holds the instance of the component (helps the component to be tested)
+    fixture = TestBed.createComponent(ClicksResultComponent);
+
+    // Initialize Component
+    component = fixture.componentInstance;
+  });
+  
+});
+```
+
+Note that fixtures can be used to access the DOM elements and trigger change detection.
+
+
+
+== Adding interfaces
+
+you can add interfaces to your tests to help with type checking and code completion. This is especially useful when dealing with complex data structures.
+
+```ts
+    ...
+    describe('addUser', () => {
+        it('should add a user', () => {
+            const user: UserInterface = { 
+                id: '1', 
+                name: 'Foo' 
+            };
+            userService.addUser(user);
+            expect(userService.users).toEqual([{ id: '1', name: 'Foo' }]);
+        });
+    });
+    ...
+```
+
+Another example this time with just adding direct data injection
+
+```ts
+    ...
+    describe('removeUser', () => {
+        it('should remove a user', () => {
+            userService.users = [
+                { id: '3', name: 'Foo' },
+            ];
+            userService.removeUser('3');
+            expect(userService.users).toEqual([]);
+        });
+    });
+    ...
+```
+
+== Routing
+
+When testing components or services that depend on Angular's Router, you can use the RouterTestingModule to provide a mock router for your tests. This allows you to test navigation and route-related functionality without needing to set up a full Angular application.
+
+```ts
+describe('SwapiService', () => {
+  let service: SwapiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      providers: [
+        SwapiService,
+        providRouter([])
+      ]
+    }).compileComponents();
+
+    // Inject the service and the mock http controller.
+    service = TestBed.inject(SwapiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+});
+```
+
+
+== Using Mocks and Spies
+
+Again the following is the System Under Test
+
+```ts
+import { Injectable, inject } from '@angular/core'; 
+import { UserInteface } from '../types/user.interface'; 
+import { UtilsService } from './utils.service';
+
+@Injectable()
+export class UsersService
+  utilsService = inject(UtilsService); 
+  users: UserInteface[] = [];
+  
+  addUser(user: UserInteface): void {
+    this.users = [...this.users, user];  
+  }
+
+  removeUser(userId: string): void {
+    const updatedUsers = this.users.filter((user) => userId !== user.id); 
+    this.users = updatedUsers;
+  }
+  
+  getUserNames(): string[] {
+    return this.utilsService.pluck(this.users, 'name');
+  }
+}
+```
+
+and testing code
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import { SwapiService, SwapiResponse, Person } from './swapi.service';
+
+describe('SwapiService', () => {
+  let userService: UserService;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      providers: [UserService, UtilsService]
+    });
+
+    // Inject the service and the mock http controller.
+    userService = TestBed.inject(UserService);
+  });
+
+  afterEach(() => {
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+});
+```
+
+== Example of Spies
+
+Let say you want to test
+```ts
+export class ClicksResultComponent { 
+  trackOtherUrl = output();
+  clicks = input.required<number>();  
+
+  onTrackOtherUrl() {
+    this.trackOtherurl.emit();
+  }
+}
+```
+
+Test as follows
+
+```ts
+import { ComponentFixture, Test Bed } from "@angular/core/testing" 
+import { ClicksResultComponent } from "./clicks-result.component";
+import { provideRouter } from '@angular/router';
+
+describe("Clicks ResultComponent", () => {
+
+  let component: ClicksResultComponent;
+  let fixture: ComponentFixture<ClicksResultComponent>; 
+  
+  beforeEach (async () => {
+    await TestBed.configureTestingModule({
+      imports: [ClicksResultComponent], // Standalone (Angular 18) component
+      providers: [provideRouter([])] // Will solve No provider for Active Route
+    }).compileComponents();
+
+    // Fixture holds the instance of the component (helps the component to be tested)
+    fixture = TestBed.createComponent(ClicksResultComponent);
+
+    // Initialize Component
+    component = fixture.componentInstance;
+  });
+
+  it("should create clicksResultComponent", () => {
+    expect(component).toBeTruthy();
+  });
+
+
+  it("should emit trackOtherUrl when onTrackOtherUrl is called", () => {
+    spyOn(component.trackOtherUrl, "emit");
+
+    component.onTrackOtherUrl();
+
+    expect(component.trackOtherUrl.emit).toHaveBeenCalled(1);
+  });
+
+  // Sinals way of testing
+  it("should have clicks as required input", () => {
+    // sets the value of the clicks input property on the component to 10. 
+    // This simulates passing an input from a parent component in a real Angular application.
+    fixture.componentRef.setInput("clicks", 10);
+
+    // Triggers Angular's change detection, ensuring that the component processes the new input value.
+    fixture.detectChanges();
+
+    expect(component.clicks).toBe(10);
+  });
+
+});
+
+```
+
+Notice that in the last test this would also work (From older versions of angular)
+
+```ts
+    it("should have clicks as required input", () => {
+        component.clicks = 10;
+        expect(component.clicks).toBe(10);
+    });
+```
+
+Another Example based on 
+
+```ts
+export class SearchClicksComponent { 
+  shortenedUrl = model<string | null>(null);
+  onSubmit = output<String | null>();
+
+  onShortUrlSubmit() {
+    this.onSubmit.emit(this.shortenedUrl());
+  }
+}
+```
+
+Unit Test
+
+```ts
+  it("should emit shortenedUrl when onShortUrlSubmit is clicked", () => {
+    spyOn(component.onSubmit, "emit");
+
+    // Configure the input property shortenedUrl
+    const shortUtl = "http://short.url/example";
+    fixture.componentRef.setInput("shortenedUrl", shortUtl);
+    fixture.detectChanges();
+
+    // Act
+    component.onShortUrlSubmit();
+
+    // Assert
+    expect(component.onSubmit.emit).toHaveBeenCalledWith(shortUtl);
+  });
+```
+
+Source To Test
+
+```ts
+export class TableComponent<T> { 
+  columns = input.required<TableColumnDefinition[]>();
+  tableData = input.required<any[]>
+  buttonText = signal<string>('Copy');
+  selectRow = signame<any | null>(null);
+
+  copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text).then (
+      () => {
+        this.selectedRow.set(text);
+        this.buttonText.set('Copied');
+        
+        setTimeout(() => {
+          this.buttonText.set('Copy');
+        }, 2000);
+      },
+      err => {
+        console.error('Failed to copy url: ', err);
+      }
+    );
+  }
+}
+```
+
+This can be testsed as follows
+
+```ts
+import { ComponentFixture, Test Bed } from "@angular/core/testing" 
+import { TableComponent } from "./teble.component";
+import { provideRouter } from '@angular/router';
+
+describe("TableComponent", () => {
+
+  let component: TableComponent<any>;
+  let fixture: ComponentFixture<TableComponent<any>>; 
+  
+  beforeEach (async () => {
+    await TestBed.configureTestingModule({
+      imports: [TableComponent],        // Standalone (Angular 18) component
+    }).compileComponents();
+
+    // Fixture holds the instance of the component (helps the component to be tested)
+    fixture = TestBed.createComponent(TableComponent);
+
+    // Initialize Component
+    component = fixture.componentInstance;
+  });
+
+  it("should create TableComponent", () => {
+    expect(component).toBeTruthy();
+  });
+
+
+  it("should set buttontext to copied and selectRow to copied text on successful copy", () => {
+    const sameTextToCopy = "Sample Text";
+    spyOn(navigator.clipboard, "writeText").and.returnValue(Promise.resolve());
+    
+    component.copyToClipboard(sameTextToCopy);
+    await navigator.clipboard.writeText(sameTextToCopy);
+
+    expect(component.selectedRow()).toBe(sameTextToCopy);
+    expect(component.buttonText()).toBe("Copied");
+  });
+
+  it("should reset buttontext to copy after 2 seconds", () => {
+    jasmine.clock().install();
+
+    const sameTextToCopy = "Sample Text";
+    spyOn(navigator.clipboard, "writeText").and.returnValue(Promise.resolve());
+    
+    component.copyToClipboard(sameTextToCopy);
+
+    await navigator.clipboard.writeText(sameTextToCopy);
+    jasmine.clock().tick(2000);
+
+    expect(component.buttonText()).toBe("Copy");
+    jasmine.clock().uninstall();
+  });
+
+  it("should log an error message if copy fails", () => {
+    const consoleSpy = spyOn(console, "error");
+
+    const sameTextToCopy = "Sample Text";
+    spyOn(navigator.clipboard, "writeText").and.returnValue(Promise.reject("Copy Failed"));
+    
+    component.copyToClipboard(sameTextToCopy);
+
+    await navigator.clipboard.writeText(sameTextToCopy).catch(() => {}); // Remember this will throw error
+
+    expect(consoleSpy).toHaveBeenCalledWith("Failed to copy url: ", "Copy Failed");
+
+  });
+
+
+});
+```
+
+== Another Example
+
+TYpe Definitions
+
+```ts
+export type AppInfo = { 
+  version: string,
+  environment: Environment, 
+  apiUrl: string,  
+}
+
+export const APP_INFO = new InjectionToken<AppInfo>('app Info');
+
+export const provideAppInfo= (value: AppInfo) => ({
+  provide: APP_INFO,
+  useValue: value,
+});
+
+export const devAppInfo: AppInfo = {
+  version: 1.0.0',
+  environment: 'development',
+  apiUrl: 'http://localhost:5164/api/'
+};
+
+export const prodAppInfo: AppInfo = { 
+  version: 1.0.0',
+  environment: 'production',
+  apiUrl: 'https://trimurl.in/api/'
+};
+```
+
+Service Code
+
+```ts
+@Injectable({
+  providedIn: 'root',
+})
+export AnalyticService {
+  #backendUrl = inject(APP_INFO).apiUrl;
+  #http = inject(HttpClient);
+  
+  getClicks(urlCode: string) {
+    return this.#http.get(`${this.#backendUrl}analytics/${urlCode}`};
+  }
+}
+```
+
+Component Code
+
+```ts
+export class AnalyticsComponent {
+  totalClicks = signal<number>(0); 
+  isResultVisible = signal<boolean> (false);
+  shortUrl = model<string | null>(null);
+  
+  #analyticService = inject (AnalyticService);
+  
+  getUrlCodeClicks (shortenedUrl: string | null) {
+    const urlCode = extractUrlCode (shortenedUrl as string) as string; 
+    this.#analyticService.getClicks(urlCode).subscribe((clicks) => { 
+      this.totalClicks.set(clicks as number); 
+      this.isResultVisible.set(true);
+    });  
+  }
+  
+  resetForm() {
+    this.shorturl.set(null);
+    this.isResultVisible.set(false);
+  }
+}
+```
+
+Unit Tests
+
+```ts
+import { ComponentFixture, Test Bed } from "@angular/core/testing" 
+import { AnalyticsComponent } from "./analytics.component";
+import { AnalyticService } from "../../analytic.service";
+import { provideHttpClient } from '@angular/common/http';
+
+describe("AnalyticsComponent", () => {
+
+  let component: AnalyticsComponent;
+  let fixture: ComponentFixture<AnalyticsComponent>;
+  let service: AnalyticService;
+  
+  beforeEach (async () => {
+    await TestBed.configureTestingModule({
+      imports: [AnalyticsComponent],
+      providers: [
+        provideHttpClient(),
+        AnalyticService,
+        {provider: APP_INFO, useValue: devAppInfo}
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(AnalyticsComponent);
+    component = fixture.componentInstance;
+    service = TestBed.inject(AnalyticService);
+
+  });
+
+  it("should create AnalyticsComponent", () => {
+    expect(component).toBeTruthy();
+  });
+
+  it("should set totalClicks and isResultVisible on successful getUrlCodeClicks", () => {
+    const mockClicks = 10;
+    const mockShortUrl = "http://short.url/abc123";
+
+    spyOn(service, "getClicks").and.returnValue(of(mockClicks));
+
+    component.getUrlCodeClicks(mockShortUrl);
+
+    expect(service.getClicks()).toHaveBeenCalledWith("abc123");
+    expect(component.totalClicks()).toBe(10);
+    expect(component.isResultVisible()).toBeTrue();
+  });
+
+  it("should reset shortUrl and isResultVisible on resetForm call", () => {
+    component.shortUrl.set("http://short.url/abc123");
+    component.isResultVisible.set(true);
+
+    component.resetForm();
+
+    expect(component.shortUrl()).toBeNull();
+    expect(component.isResultVisible()).toBeFalse();
+  });
+
+});
+```
+
+== Home Component Example
+
+Service Code
+
+```ts
+export class UrlService {
+  #backendUrl = inject (APP_INFO). apiUrl;
+  #http = inject (HtpClient);
+  shortUrl(longUrl: string) {
+    return this. #http.post<UrlResponse>(`${this. #backendUrl}short`, { longUrl });
+  }
+
+  getLongUrl(urlCode: string) {
+    return this. #http.get(`${this. #backendUrl}/${urlCode}`);
+  }
+
+  getPagedUrls (page: number, itemsPerPage: number) {
+    const url = `${this. #backendUrl}paged_urls?pageIndex=${page}&pageSize=${itemsPerPage}`;
+    return this.#http.get<PagedResult<Url>>(url);
+  }
+
+  export type UrlResponse = {
+    isSuccess: boolean,
+    statusCode: number,
+    shortUrl: string | null,
+    errorMessage: string | null,
+  }
+
+  export type PageResult<T> = {
+    pageIndex: number,
+    pageSize: number,
+    totalCount: number,
+    totalPages: number,
+    hasPreviousPage: boolean,
+    hasNextPage: boolean,
+    data: T[]
+  }
+}
+```
+
+
+Component File
+
+```ts
+export class HomeComponent {
+  shortUrl = signal('');
+  errorResponse = signal<UrlResponse | null>(null); 
+  #urlService = inject (UrlService);
+  
+  shortenUrl(longUrl: string | null) {
+    if (longUrl) {
+      this.#urlService.shortUrl(longUrl as string).subscribe({
+        next: (response) => {
+          this.shortUrl.set(response.shortUrl as string);
+        },
+        error: (errResponse: any) => {
+          this.errorResponse.set(errResponse.error); 
+          console.error(errResponse.error.errorMessage);
+        },
+      });
+    }
+  }
+}
+```
+
+with Unit Tests
+```ts
+
+import { ComponentFixture, Test Bed } from "@angular/core/testing" 
+import { HomeComponent } from "./home.component";
+import { AnalyticService } from "../../analytic.service";
+import { provideHttpClient } from '@angular/common/http';
+
+describe("HomeComponent", () => {
+
+  let component: HomeComponent;
+  let fixture: ComponentFixture<HomeComponent>;
+  let service: UrlService;
+
+  beforeEach (async () => {
+    await TestBed.configureTestingModule({
+      imports: [HomeComponent],
+      providers: [
+        provideHttpClient(),
+        UrlService,
+        {provider: APP_INFO, useValue: devAppInfo}
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(HomeComponent);
+    component = fixture.componentInstance;
+    service = TestBed.inject(UrlService);
+  });
+
+  it("should create HomeComponent", () => {
+    expect(component).toBeTruthy();
+  });
+
+  it("should set shortUrl on successful urlService shortUrl call", () => {
+    const mockResponse: UrlResponse = {
+      isSuccess: true,
+      statusCode: 200,
+      shortUrl: "http://short.url/abc123",
+      errorMessage: string | null,
+    };
+
+    const mockLongUrl = "http://example.com/very/long/url";
+
+    spyOn(service, "shortUrl").and.returnValue(of(mockResponse));
+
+    component.shortenUrl(mockLongUrl);
+
+    expect(service.shortUrl).toHaveBeenCalledOnceWith(mockLongUrl);
+    expect(component.shortUrl()).toBe(mockResponse.shortUrl as string);
+    expect(component.errorResponse()).toBeNull();
+  });
+
+  it("should set errorMessage on failures of urlService shortUrl call", () => {
+    const mockError = {
+        error {
+            errorMessage: "Invalid URL",
+        }
+    };
+
+    const mockLongUrl = "http://example.com/very/long/url";
+
+    spyOn(service, "shortUrl").and.returnValue(throwError(() => mockError));
+
+    component.shortenUrl(mockLongUrl);
+
+    expect(service.shortUrl).toHaveBeenCalledOnceWith(mockLongUrl);
+    expect(component.errorResponse()).toEqual(mockError.error as UrlResponse);
+  });
+});
+```
+
+== UrlComponent Example
+
+Component Code
+
+```ts
+export class UrlComponent {
+    urlTableComponent = signal<TableColumnDefinition[]>(URL_TALBE_COLUMNS);
+    
+    urlTableData = signal<Url[]>([]);
+    #urlService = inject(UrlService);
+    currentPage = signal<number>(1);
+    itemsPerPage = signal<number>(8);
+    totalPages = signal<number>(1);
+    hasPreviousPage = signal(false);
+    hasNextPage = signal(false);
+
+    ngOnInit() {
+        this.getPageUrls();
+    }
+
+    previousPage() {
+        if (this.currentPage() > 1) {
+            this.currentPage.update( (prev) => prev - 1);
+            this.getPageUrls();
+        }
+    }
+
+    nextPage() {
+        if (this.currentPage() < this.totalPages()) {
+            this.currentPage.update( (prev) => prev + 1);
+            this.getPageUrls();
+        }
+    }
+
+    getPageUrls() {
+        this.#urlService
+            .getPagedUrls(this.currentPage(), this.itemsPerPage())
+            .subscribe( (result) => {
+            this.urlTableData.set(result.data);
+            this.currentPage.set(result.pageIndex);
+            this.totalPages.set(result.totalPages);
+            this.hasPreviousPage.set(result.hasPreviousPage);
+            this.hasNextPage.set(result.hasNextPage);
+        });
+    }
+}
+```
+
+Unit Tests
+
+```ts
+import { ComponentFixture, Test Bed } from "@angular/core/testing" 
+import { UrlComponent } from "./url.component";
+import { AnalyticService } from "../../analytic.service";
+import { provideHttpClient } from '@angular/common/http';
+
+describe("UrlComponent", () => {
+
+  let component: UrlComponent;
+  let fixture: ComponentFixture<UrlComponent>;
+  let service: UrlService;
+
+  beforeEach (async () => {
+    await TestBed.configureTestingModule({
+      imports: [UrlComponent],
+      providers: [
+        provideHttpClient(),
+        UrlService,
+        {provider: APP_INFO, useValue: devAppInfo}
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(UrlComponent);
+    component = fixture.componentInstance;
+    service = TestBed.inject(UrlService);
+  });
+
+  it("should create UrlComponent", () => {
+    expect(component).toBeTruthy();
+  });
+
+  it("should callgetPageUrls on ngOnInit and set values", () => {
+    spyOn(component, "getPageUrls");
+    
+    component.ngOnInit();
+
+    expect(component.getPageUrls).toHaveBeenCalled(1);
+    expect(component.currentPage()).toBe(1);
+    expect(component.itemsPerPage()).toBe(8);
+    expect(component.totalPages()).toBe(1);
+    expect(component.hasPreviousPage()).toBeFalse();
+    expect(component.hasNextPage()).toBeFalse();
+  });
+
+  it("should call getPagedUrls when previousPage is called and currentPage > 1", () => {
+    spyOn(component, "getPageUrls");
+    component.currentPage.set(2);
+    component.previousPage();
+    expect(component.getPageUrls).toHaveBeenCalled(1);
+  });
+
+  it("should not call getPagedUrls when previousPage is called and currentPage is 1", () => {
+    spyOn(component, "getPageUrls");
+    component.currentPage.set(21);
+    component.previousPage();
+    expect(component.getPageUrls).not.toHaveBeenCalled();
+  });
+
+
+  it("should not call getPagedUrls when nextPage is called and currentPage < totalPages", () => {
+    spyOn(component, "getPageUrls");
+    component.currentPage.set(1);
+    component.totalPages.set(4);
+    component.nextPage();
+    expect(component.getPageUrls).toHaveBeenCalled(1);
+  });
+
+  it("should call getPagedUrls when nextPage is called and currentPage equal totalPages", () => {
+    spyOn(component, "getPageUrls");
+    component.currentPage.set(4);
+    component.totalPages.set(4);
+    component.nextPage();
+    expect(component.getPageUrls).not.toHaveBeenCalled();
+  });
+
+  it("should set response of the api", () => {
+    const mockPagedResult: PageResult<Url> = {
+        pageIndex: 1,
+        pageSize: 8,
+        totalCount: 16,
+        totalPages: 2,
+        hasPreviousPage: false,
+        hasNextPage: true,
+        data: [
+            { 
+                id: '1', 
+                shortUrl: 'http://short.url/1',
+                longUrl: 'http://example.com/1', 
+                createdAt: new Date().toISOString()
+            },
+        ]
+    }
+
+    spyOn(service, "getPagedUrls").and.returnValue(of(mockPagedResult));
+
+    component.getPageUrls();
+
+    expect(component.urlTableData()).toEqual(mockPagedResult.data);
+    expect(component.currentPage()).toBe(mockPagedResult.pageIndex);
+    expect(component.totalPages()).toBe(mockPagedResult.totalPages);
+    expect(component.hasPreviousPage()).toBe(mockPagedResult.hasPreviousPage);  
+    expect(component.hasNextPage()).toBe(mockPagedResult.hasNextPage);
+  });
+
+});
+```
+
+== Jasmine Mocking: A Comprehensive Guide
+What is Mocking in Jasmine?
+
+Mocking is a testing technique where you replace real objects or functions with simulated versions (mocks) to control their behavior and verify interactions. Jasmine provides several ways to create mocks, primarily through spies.
+
+Types of Mocks in Jasmine
+
+Spies are a powerful feature in Jasmine that allow you to track and control function calls. They can be used to replace real functions with mock implementations, track how many times a function was called, and what arguments were passed to it.
+
+=== Spies - The Primary Mocking Tool
+Spies allow you to track calls to functions and control their behavior.
+
+Jasmine spy conforms to the following syntax:
+
+```ts
+spyOn(object, 'methodName'):
+```
+
+```ts
+// Create a spy on an existing method
+const obj = {
+  myMethod: () => 'real implementation'
+};
+
+spyOn(obj, 'myMethod');
+
+// Create a standalone spy
+const mySpy = jasmine.createSpy('mySpy');
+```
+
+=== Spy with Return Value
+```ts
+describe('Spy with return value', () => {
+  it('should return a specific value', () => {
+    const calculator = {
+      add: (a, b) => a + b
+    };
+
+    // Mock the add method to always return 10
+    spyOn(calculator, 'add').and.returnValue(10);
+    
+    expect(calculator.add(2, 3)).toBe(10); // Returns 10, not 5
+    expect(calculator.add).toHaveBeenCalled();
+  });
+});
+```
+
+=== Spy with Call Through (Partial Mock)
+
+```ts
+describe('Spy with call through', () => {
+  it('should call real implementation but still track calls', () => {
+    const service = {
+      fetchData: () => 'real data'
+    };
+
+    spyOn(service, 'fetchData').and.callThrough();
+    
+    const result = service.fetchData();
+    expect(result).toBe('real data');
+    expect(service.fetchData).toHaveBeenCalled();
+  });
+});
+```
+
+
+=== Spy with Fake Implementation
+
+```ts
+describe('Spy with fake implementation', () => {
+  it('should use custom implementation', () => {
+    const api = {
+      getUser: (id) => ({ id, name: 'Real User' })
+    };
+
+    spyOn(api, 'getUser').and.callFake((id) => ({
+      id,
+      name: 'Mock User',
+      email: 'mock@example.com'
+    }));
+    
+    const user = api.getUser(1);
+    expect(user.name).toBe('Mock User');
+    expect(user.email).toBe('mock@example.com');
+  });
+});
+```
+
+
+=== Mocking Async Functions
+
+```ts
+describe('Async function mocking', () => {
+  it('should mock async functions with promises', async () => {
+    const apiService = {
+      fetchData: () => Promise.resolve('real data')
+    };
+
+    // Mock with resolved promise
+    spyOn(apiService, 'fetchData').and.resolveTo('mock data');
+    
+    const result = await apiService.fetchData();
+    expect(result).toBe('mock data');
+  });
+
+  it('should mock async function rejection', async () => {
+    const apiService = {
+      fetchData: () => Promise.resolve('success')
+    };
+
+    // Mock with rejected promise
+    spyOn(apiService, 'fetchData').and.rejectWith(new Error('Network error'));
+    
+    await expectAsync(apiService.fetchData()).toBeRejectedWithError('Network error');
+  });
+});
+```
+
+=== Mocking Objects and Dependencies
+
+```ts
+// Real service
+class UserService {
+  constructor(apiClient) {
+    this.apiClient = apiClient;
+  }
+  
+  getUserProfile(id) {
+    return this.apiClient.get(`/users/${id}`);
+  }
+}
+
+// Test
+describe('UserService with mocked dependency', () => {
+  it('should use mocked API client', () => {
+    // Create mock API client
+    const mockApiClient = {
+      get: jasmine.createSpy('get').and.returnValue(Promise.resolve({
+        id: 1,
+        name: 'Test User'
+      }))
+    };
+
+    const userService = new UserService(mockApiClient);
+    
+    return userService.getUserProfile(1).then(profile => {
+      expect(profile.name).toBe('Test User');
+      expect(mockApiClient.get).toHaveBeenCalledWith('/users/1');
+    });
+  });
+});
+```
+
+
+=== Verifying Calls and Arguments
+```ts
+describe('Verifying spy calls', () => {
+  it('should verify call details', () => {
+    const logger = {
+      log: (message) => console.log(message)
+    };
+
+    spyOn(logger, 'log');
+    
+    logger.log('error message');
+    logger.log('info message', 'additional data');
+    
+    // Basic verification
+    expect(logger.log).toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledTimes(2);
+    
+    // Argument verification
+    expect(logger.log).toHaveBeenCalledWith('error message');
+    expect(logger.log).toHaveBeenCalledWith('info message', jasmine.anything());
+    
+    // More specific argument matching
+    expect(logger.log).toHaveBeenCalledWith(
+      jasmine.stringMatching('message'),
+      jasmine.any(String)
+    );
+  });
+});
+```
+
+=== Mocking Date and Time
+```ts
+describe('Mocking date', () => {
+  it('should mock current date', () => {
+    const fixedDate = new Date(2023, 0, 1); // Jan 1, 2023
+    
+    // Mock Date constructor
+    spyOn(global, 'Date').and.returnValue(fixedDate);
+    
+    const currentDate = new Date();
+    expect(currentDate).toEqual(fixedDate);
+  });
+});
+```
+
+=== Resetting Spies
+
+```ts
+describe('Resetting spies', () => {
+  it('should reset spy between tests', () => {
+    const obj = { method: () => {} };
+    const spy = spyOn(obj, 'method');
+    
+    obj.method();
+    expect(spy).toHaveBeenCalledTimes(1);
+    
+    // Reset spy
+    spy.calls.reset();
+    
+    obj.method();
+    expect(spy).toHaveBeenCalledTimes(1); // Count reset
+  });
+});
+```
+
+=== Best Practices for Jasmine Mocking
+
+1. Use descriptive names: jasmine.createSpy('fetchUserData') is better than anonymous spies
+2. Keep mocks simple: Don't over-complicate mock implementations
+3. Reset between tests: Use afterEach() to clean up spies
+4. Verify interactions: Always check that mocks were called as expected
+5. Use appropriate matchers: jasmine.any(), jasmine.objectContaining(), etc.
+
+```ts
+// Example of good test structure
+describe('UserService', () => {
+  let userService;
+  let mockApiClient;
+
+  beforeEach(() => {
+    mockApiClient = {
+      get: jasmine.createSpy('get'),
+      post: jasmine.createSpy('post')
+    };
+    
+    userService = new UserService(mockApiClient);
+  });
+
+  afterEach(() => {
+    // Reset all spies
+    jasmine.clock().uninstall();
+  });
+
+  it('should fetch user data correctly', async () => {
+    mockApiClient.get.and.resolveTo({ id: 1, name: 'Test User' });
+    
+    const result = await userService.getUser(1);
+    
+    expect(result.name).toBe('Test User');
+    expect(mockApiClient.get).toHaveBeenCalledWith('/users/1');
+  });
+});
+```
+
+Common Jasmine Matchers for Mocks:
+
+* toHaveBeenCalled()
+* toHaveBeenCalledTimes(number)
+* toHaveBeenCalledWith(...args)
+* toHaveBeenCalledWith(jasmine.any(constructor))
+* toHaveBeenCalledWith(jasmine.objectContaining({...}))
+

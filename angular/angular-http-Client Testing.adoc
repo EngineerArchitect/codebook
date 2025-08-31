@@ -1,0 +1,289 @@
+== Source Under Test
+
+```ts
+// services/swapi.service.ts
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+export interface Person {
+  uid: string;
+  name: string;
+  url: string;
+}
+
+export interface SwapiResponse {
+  results: Person[];
+}
+
+@Injectable({
+  providedIn: 'root'  // This is important for standalone apps
+})
+export class SwapiService {
+  private apiUrl = 'https://swapi.tech/api/people';
+
+  constructor(private http: HttpClient) { }
+
+  getPeople(): Observable<SwapiResponse> {
+    return this.http.get<SwapiResponse>(this.apiUrl);
+  }
+}
+```
+
+Here are Unit Tests for the Service:
+
+```ts
+import { TestBed } from '@angular/core/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { SwapiService, SwapiResponse, Person } from './swapi.service';
+import { provideHttpClient } from '@angular/common/http';
+
+describe('SwapiService', () => {
+  let service: SwapiService;
+  let httpTestingController: HttpTestingController;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [],
+      declarations: [],
+      providers: [
+        SwapiService,
+        provideHttpClient(),
+        provideHttpClientTesting()
+      ]
+    }).compileComponents();
+
+    // Inject the service and the mock http controller.
+    service = TestBed.inject(SwapiService);
+    httpTestingController = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    // After each test, verify that there are no outstanding requests.
+    httpTestingController.verify();
+  });
+
+  it('should be created', () => {
+    // Test that the service instance is successfully created.
+    expect(service).toBeTruthy();
+  });
+
+  it('should retrieve a list of people from the API', () => {
+    // Define the mock data that the service should receive.
+    const mockPeople: SwapiResponse = {
+      results: [
+        { uid: '1', name: 'Luke Skywalker', url: 'https://swapi.tech/api/people/1' },
+        { uid: '2', name: 'C-3PO', url: 'https://swapi.tech/api/people/2' }
+      ]
+    };
+
+    service.getPeople().subscribe((response: SwapiResponse) => {
+      // Assert that the response from the service matches the mock data.
+      expect(response).toEqual(mockPeople);
+    });
+
+    // Expect a single HTTP GET request to the correct URL.
+    const req = httpTestingController.expectOne('https://swapi.tech/api/people');
+
+    // Assert that the request method is GET.
+    expect(req.request.method).toBe('GET');
+
+    // Flush the mock data to the request, simulating a successful API response.
+    req.flush(mockPeople);
+  });
+});
+```
+
+Component using the service above
+
+```ts
+// people-list.component.ts
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { SwapiService, Person } from '../services/swapi.service';
+
+@Component({
+  selector: 'app-people-list',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './people-list.component.html',
+  styleUrls: ['./people-list.component.css']
+})
+export class PeopleListComponent {
+  people: Person[] = [];
+  loading = false;
+  error: string | null = null;
+
+  constructor(private swapiService: SwapiService) { }
+
+  fetchPeople(): void {
+    this.loading = true;
+    this.error = null;
+    
+    this.swapiService.getPeople().subscribe({
+      next: (response) => {
+        this.people = response.results;
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = 'Failed to fetch people. Please try again.';
+        this.loading = false;
+        console.error('Error fetching people:', err);
+      }
+    });
+  }
+}
+```
+
+Unit Tests for the Component
+
+```ts
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { PeopleListComponent } from './people-list.component';
+import { SwapiService } from '../services/swapi.service';
+import { of, throwError } from 'rxjs';
+import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+
+describe('PeopleListComponent', () => {
+  let component: PeopleListComponent;
+  let fixture: ComponentFixture<PeopleListComponent>;
+  let swapiService: SwapiService;
+  let httpMock: HttpTestingController;
+
+  const mockPeople = [
+    { uid: '1', name: 'Luke Skywalker', url: 'https://swapi.tech/api/people/1' },
+    { uid: '2', name: 'Darth Vader', url: 'https://swapi.tech/api/people/2' }
+  ];
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      declarations: [],
+      imports: [PeopleListComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        SwapiService]
+    }).compileComponents();
+
+    // Fixture holds the instance of the component (helps the component to be tested)
+    fixture = TestBed.createComponent(PeopleListComponent);
+
+    // Initialize Component
+    component = fixture.componentInstance;
+
+    swapiService = TestBed.inject(SwapiService);
+    httpMock = TestBed.inject(HttpTestingController);
+
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should fetch people successfully', fakeAsync(() => {
+    spyOn(swapiService, 'getPeople').and.returnValue(of({ results: mockPeople }));
+
+    component.fetchPeople();
+    tick();
+
+    expect(component.people.length).toBe(2);
+    expect(component.loading).toBeFalse();
+    expect(component.error).toBeNull();
+    expect(component.people[0].name).toBe('Luke Skywalker');
+  }));
+
+  it('should handle error when fetching people fails', fakeAsync(() => {
+    const errorResponse = new ErrorEvent('Network error');
+    spyOn(swapiService, 'getPeople').and.returnValue(throwError(() => errorResponse));
+
+    component.fetchPeople();
+    tick();
+
+    expect(component.people.length).toBe(0);
+    expect(component.loading).toBeFalse();
+    expect(component.error).toBe('Failed to fetch people. Please try again.');
+  }));
+
+  it('should set loading state correctly', () => {
+    spyOn(swapiService, 'getPeople').and.returnValue(of({ results: mockPeople }));
+
+    component.loading = false;
+
+    component.fetchPeople();
+
+    expect(component.loading).toBeFalse();
+  });
+});
+```
+
+== Other Example (Angular 18)
+
+```ts
+export interface User {
+    id: number;
+    name: string;
+}
+
+@Injectable({
+    providedIn: 'root'
+})
+export class UserService {
+    http = inject(HttpClient);
+
+    getUsers(): Observable<User[]> {
+        return this.http.get<User[]>('https://jsonplaceholder.typicode.com/users');
+    }
+}
+```
+
+Unit Tests for the Service
+
+```ts
+describe('UserService', () => {})
+    let userService: UserService;
+    lethttpTesting: HttoTestingController;
+
+    beforeEach( () => {
+        TestBed.configureTestingModule({
+            providers: [
+                UserService,
+                provideHttpClient(),
+                provideHttpClientTesting()
+            ]
+        });
+
+        userService = TestBed.inject(UserService);
+        httpTesting = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => {
+        httpTesting.verify(); // verify that there are no outstanding requests
+    });
+
+    it('should fetch users', () => {
+        const mockUsers: User[] = [
+            { id: 1, name: 'Alice' },
+            { id: 2, name: 'Steve' }
+        ];
+
+        userService.getUsers().subscribe(users => {
+            expect(users.length).toBe(2);
+            expect(users).toEqual(mockUsers);
+        });
+
+        const req = httpTesting.expectOne('https://jsonplaceholder.typicode.com/users');
+
+        expect(req.request.method).toBe('GET');
+
+        req.flush(mockUsers);
+    });
+
+```

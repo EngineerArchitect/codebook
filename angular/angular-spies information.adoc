@@ -1,0 +1,265 @@
+== Jasmine Mocking: A Comprehensive Guide
+What is Mocking in Jasmine?
+
+Mocking is a testing technique where you replace real objects or functions with simulated versions (mocks) to control their behavior and verify interactions. Jasmine provides several ways to create mocks, primarily through spies.
+
+Types of Mocks in Jasmine
+
+Spies are a powerful feature in Jasmine that allow you to track and control function calls. They can be used to replace real functions with mock implementations, track how many times a function was called, and what arguments were passed to it.
+
+=== Spies - The Primary Mocking Tool
+Spies allow you to track calls to functions and control their behavior.
+
+Jasmine spy conforms to the following syntax:
+
+```ts
+spyOn(object, 'methodName'):
+```
+
+```ts
+// Create a spy on an existing method
+const obj = {
+  myMethod: () => 'real implementation'
+};
+
+spyOn(obj, 'myMethod');
+
+// Create a standalone spy
+const mySpy = jasmine.createSpy('mySpy');
+```
+
+=== Spy with Return Value
+```ts
+describe('Spy with return value', () => {
+  it('should return a specific value', () => {
+    const calculator = {
+      add: (a, b) => a + b
+    };
+
+    // Mock the add method to always return 10
+    spyOn(calculator, 'add').and.returnValue(10);
+    
+    expect(calculator.add(2, 3)).toBe(10); // Returns 10, not 5
+    expect(calculator.add).toHaveBeenCalled();
+  });
+});
+```
+
+=== Spy with Call Through (Partial Mock)
+
+```ts
+describe('Spy with call through', () => {
+  it('should call real implementation but still track calls', () => {
+    const service = {
+      fetchData: () => 'real data'
+    };
+
+    spyOn(service, 'fetchData').and.callThrough();
+    
+    const result = service.fetchData();
+    expect(result).toBe('real data');
+    expect(service.fetchData).toHaveBeenCalled();
+  });
+});
+```
+
+
+=== Spy with Fake Implementation
+
+```ts
+describe('Spy with fake implementation', () => {
+  it('should use custom implementation', () => {
+    const api = {
+      getUser: (id) => ({ id, name: 'Real User' })
+    };
+
+    spyOn(api, 'getUser').and.callFake((id) => ({
+      id,
+      name: 'Mock User',
+      email: 'mock@example.com'
+    }));
+    
+    const user = api.getUser(1);
+    expect(user.name).toBe('Mock User');
+    expect(user.email).toBe('mock@example.com');
+  });
+});
+```
+
+
+=== Mocking Async Functions
+
+```ts
+describe('Async function mocking', () => {
+  it('should mock async functions with promises', async () => {
+    const apiService = {
+      fetchData: () => Promise.resolve('real data')
+    };
+
+    // Mock with resolved promise
+    spyOn(apiService, 'fetchData').and.resolveTo('mock data');
+    
+    const result = await apiService.fetchData();
+    expect(result).toBe('mock data');
+  });
+
+  it('should mock async function rejection', async () => {
+    const apiService = {
+      fetchData: () => Promise.resolve('success')
+    };
+
+    // Mock with rejected promise
+    spyOn(apiService, 'fetchData').and.rejectWith(new Error('Network error'));
+    
+    await expectAsync(apiService.fetchData()).toBeRejectedWithError('Network error');
+  });
+});
+```
+
+=== Mocking Objects and Dependencies
+
+```ts
+// Real service
+class UserService {
+  constructor(apiClient) {
+    this.apiClient = apiClient;
+  }
+  
+  getUserProfile(id) {
+    return this.apiClient.get(`/users/${id}`);
+  }
+}
+
+// Test
+describe('UserService with mocked dependency', () => {
+  it('should use mocked API client', () => {
+    // Create mock API client
+    const mockApiClient = {
+      get: jasmine.createSpy('get').and.returnValue(Promise.resolve({
+        id: 1,
+        name: 'Test User'
+      }))
+    };
+
+    const userService = new UserService(mockApiClient);
+    
+    return userService.getUserProfile(1).then(profile => {
+      expect(profile.name).toBe('Test User');
+      expect(mockApiClient.get).toHaveBeenCalledWith('/users/1');
+    });
+  });
+});
+```
+
+
+=== Verifying Calls and Arguments
+```ts
+describe('Verifying spy calls', () => {
+  it('should verify call details', () => {
+    const logger = {
+      log: (message) => console.log(message)
+    };
+
+    spyOn(logger, 'log');
+    
+    logger.log('error message');
+    logger.log('info message', 'additional data');
+    
+    // Basic verification
+    expect(logger.log).toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledTimes(2);
+    
+    // Argument verification
+    expect(logger.log).toHaveBeenCalledWith('error message');
+    expect(logger.log).toHaveBeenCalledWith('info message', jasmine.anything());
+    
+    // More specific argument matching
+    expect(logger.log).toHaveBeenCalledWith(
+      jasmine.stringMatching('message'),
+      jasmine.any(String)
+    );
+  });
+});
+```
+
+=== Mocking Date and Time
+```ts
+describe('Mocking date', () => {
+  it('should mock current date', () => {
+    const fixedDate = new Date(2023, 0, 1); // Jan 1, 2023
+    
+    // Mock Date constructor
+    spyOn(global, 'Date').and.returnValue(fixedDate);
+    
+    const currentDate = new Date();
+    expect(currentDate).toEqual(fixedDate);
+  });
+});
+```
+
+=== Resetting Spies
+
+```ts
+describe('Resetting spies', () => {
+  it('should reset spy between tests', () => {
+    const obj = { method: () => {} };
+    const spy = spyOn(obj, 'method');
+    
+    obj.method();
+    expect(spy).toHaveBeenCalledTimes(1);
+    
+    // Reset spy
+    spy.calls.reset();
+    
+    obj.method();
+    expect(spy).toHaveBeenCalledTimes(1); // Count reset
+  });
+});
+```
+
+=== Best Practices for Jasmine Mocking
+
+1. Use descriptive names: jasmine.createSpy('fetchUserData') is better than anonymous spies
+2. Keep mocks simple: Don't over-complicate mock implementations
+3. Reset between tests: Use afterEach() to clean up spies
+4. Verify interactions: Always check that mocks were called as expected
+5. Use appropriate matchers: jasmine.any(), jasmine.objectContaining(), etc.
+
+```ts
+// Example of good test structure
+describe('UserService', () => {
+  let userService;
+  let mockApiClient;
+
+  beforeEach(() => {
+    mockApiClient = {
+      get: jasmine.createSpy('get'),
+      post: jasmine.createSpy('post')
+    };
+    
+    userService = new UserService(mockApiClient);
+  });
+
+  afterEach(() => {
+    // Reset all spies
+    jasmine.clock().uninstall();
+  });
+
+  it('should fetch user data correctly', async () => {
+    mockApiClient.get.and.resolveTo({ id: 1, name: 'Test User' });
+    
+    const result = await userService.getUser(1);
+    
+    expect(result.name).toBe('Test User');
+    expect(mockApiClient.get).toHaveBeenCalledWith('/users/1');
+  });
+});
+```
+
+Common Jasmine Matchers for Mocks:
+
+* toHaveBeenCalled()
+* toHaveBeenCalledTimes(number)
+* toHaveBeenCalledWith(...args)
+* toHaveBeenCalledWith(jasmine.any(constructor))
+* toHaveBeenCalledWith(jasmine.objectContaining({...}))
