@@ -247,9 +247,9 @@ export class UserService {
 Unit Tests for the Service
 
 ```ts
-describe('UserService', () => {})
+describe('UserService', () => {
     let userService: UserService;
-    lethttpTesting: HttoTestingController;
+    lethttpTesting: HttpTestingController;
 
     beforeEach( () => {
         TestBed.configureTestingModule({
@@ -286,4 +286,16 @@ describe('UserService', () => {})
         req.flush(mockUsers);
     });
 
+    it('should handle errors', () => {
+        userService.getUsers().subscribe(users => {
+            next: () => fail('should have failed with the 500 error'),
+            error: (error) => {
+                expect(error.status).toBe(500);
+            }
+        });
+        const req = httoTesting.expectOne('https://jsonplaceholder.typicode.com/users');
+
+        req.flush(`Internal server error`, { status: 500, statusText: 'Server Error' });
+    });
+});
 ```
